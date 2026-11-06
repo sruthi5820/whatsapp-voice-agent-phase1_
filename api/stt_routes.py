@@ -25,7 +25,7 @@ CHUNK_SIZE = 1024 * 1024  # read uploads 1 MB at a time
 
 
 def _default_model() -> str:
-    return os.getenv("DEFAULT_STT_MODEL", "whisper")
+    return os.getenv("DEFAULT_STT_MODEL", "qwen_audio")
 
 
 @router.get("/stt/models", response_model=STTModelsResponse, summary="List STT models")
@@ -86,7 +86,13 @@ def transcribe(
         start = time.perf_counter()
         text = stt_model.transcribe(tmp_path, language)
         elapsed = round(time.perf_counter() - start, 2)
-        logger.info("STT '%s' finished in %.2fs (%d chars)", model_name, elapsed, len(text))
+        logger.info(
+            "STT '%s' [%s] finished in %.2fs: %s",
+            model_name,
+            language,
+            elapsed,
+            text or "(empty)",
+        )
         return STTResponse(text=text, model=model_name, language=language, processing_seconds=elapsed)
 
     except ModelLoadError as exc:

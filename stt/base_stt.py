@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 # Sample rate expected by Whisper and IndicConformer.
 TARGET_SAMPLE_RATE = 16000
 
+# Containers/codecs that librosa/soundfile often cannot read on their own, so
+# they are decoded through system (or bundled) ffmpeg instead.
+FFMPEG_EXTENSIONS = (".webm", ".opus", ".ogg", ".m4a", ".mp4", ".mp3", ".aac")
+
 
 class STTError(Exception):
     """Base error for all STT problems."""
@@ -33,8 +37,8 @@ def load_audio(path: str, sample_rate: int = TARGET_SAMPLE_RATE):
     Formats like mp3/m4a/webm need `ffmpeg` installed on the system.
     """
     # librosa/soundfile often cannot read browser MediaRecorder WebM/Opus on
-    # macOS, so decode that container through system or bundled ffmpeg.
-    if path.lower().endswith((".webm", ".opus", ".ogg")):
+    # macOS, so decode those containers through system or bundled ffmpeg.
+    if path.lower().endswith(FFMPEG_EXTENSIONS):
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             try:

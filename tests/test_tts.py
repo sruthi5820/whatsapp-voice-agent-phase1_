@@ -8,9 +8,9 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import tts  # noqa: E402
+import tts_models as tts  # noqa: E402
 from api.main import app  # noqa: E402
-from tts.base_tts import BaseTTS, SynthesisError, SynthesisResult, save_wav  # noqa: E402
+from tts_models.base_tts import BaseTTS, SynthesisError, SynthesisResult, save_wav  # noqa: E402
 
 
 class FakeTTS(BaseTTS):
@@ -70,6 +70,29 @@ def test_save_wav_writes_riff_file(tmp_path):
     path = tmp_path / "out.wav"
     save_wav(result, str(path))
     assert path.read_bytes()[:4] == b"RIFF"
+
+
+def test_normalize_boosts_quiet_audio_without_clipping():
+    from tts_models.base_tts import normalize_loudness
+
+    sr = 24000
+    t = np.linspace(0, 1, sr, endpoint=False)
+    quiet = (0.05 * np.sin(2 * np.pi * 220 * t)).astype("float32")
+    out = normalize_loudness(quiet, sr, target_rms_dbfs=-16, peak_dbfs=-1)
+
+    before = float(np.sqrt(np.mean(quiet.astype("float64") ** 2)))
+    after = float(np.sqrt(np.mean(out.astype("float64") ** 2)))
+    assert after > before * 2
+    assert float(np.max(np.abs(out))) <= 1.0
+
+
+def test_normalize_leaves_silence_untouched():
+    from tts_models.base_tts import normalize_loudness
+
+    silence = np.zeros(2400, dtype="float32")
+    out = normalize_loudness(silence, 24000)
+    assert not np.any(out)
+    assert out.dtype == np.float32
 
 
 # ---- API ----

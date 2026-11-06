@@ -56,7 +56,7 @@ def _upload(client, name="clip.wav", data=b"RIFFxxxx", model="fake"):
 # ---- registry / base class ----
 def test_registry_lists_builtin_models():
     models = stt.available_stt_models()
-    assert "whisper" in models and "indicconformer" in models
+    assert "qwen_audio" in models and "whisper" in models and "indicconformer" in models
 
 
 def test_unknown_model_raises():

@@ -21,6 +21,11 @@
 
       <div id="callStatus" class="status"></div>
 
+      <label for="callMicSelect">Microphone</label>
+      <select id="callMicSelect">
+        <option value="">System default</option>
+      </select>
+
       <button class="btn call-btn" id="callBtn" type="button">▶ Start Call</button>
 
       <div class="loading hidden" id="callLoading"><span class="spinner"></span> AI is thinking… STT → LLM → TTS</div>
@@ -68,6 +73,7 @@
 
       <label for="sttModel">Model</label>
       <select id="sttModel">
+        <option value="qwen_audio" selected>Qwen2-Audio</option>
         <option value="whisper">OpenAI Whisper</option>
         <option value="indicconformer">AI4Bharat IndicConformer</option>
       </select>

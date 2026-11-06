@@ -31,6 +31,7 @@ class UnknownSTTModelError(STTError):
 
 # name -> "module:Class" (imported lazily) or a class registered at runtime.
 _BUILTIN: dict[str, object] = {
+    "qwen_audio": "stt.qwen_audio_stt:QwenAudioSTT",
     "whisper": "stt.whisper_stt:WhisperSTT",
     "indicconformer": "stt.indicconformer_stt:IndicConformerSTT",
 }

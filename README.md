@@ -1,6 +1,6 @@
 # Voice App – Phase 1 (STT + TTS)
 
-A standalone Malayalam voice-processing service (mixed Malayalam-English is supported for TTS): **Speech-to-Text** (Whisper, AI4Bharat IndicConformer) and **Text-to-Speech** (`ai4bharat/indic-parler-tts`, with `facebook/mms-tts-mal` as a lighter fallback), exposed through a FastAPI backend with a simple web frontend.
+A standalone Malayalam voice-processing service (mixed Malayalam-English is supported for TTS): **Speech-to-Text** (Qwen2-Audio, Whisper, AI4Bharat IndicConformer) and **Text-to-Speech** (`ai4bharat/indic-parler-tts`, with `facebook/mms-tts-mal` as a lighter fallback), exposed through a FastAPI backend with a simple web frontend.
 
 This is **Phase 1** of a WhatsApp AI agent. WhatsApp, n8n and LLM-agent integration are intentionally *not* included; they come in Phase 2.
 
@@ -19,7 +19,7 @@ This is **Phase 1** of a WhatsApp AI agent. WhatsApp, n8n and LLM-agent integrat
 ```
 voice-app/
 ├── stt/        # base_stt.py (interface), whisper_stt.py, indicconformer_stt.py, registry in __init__.py
-├── tts/        # base_tts.py (interface), mms_tts.py, registry in __init__.py
+├── tts_models/ # base_tts.py (interface), maya_tts.py, mms_tts.py, registry in __init__.py
 ├── api/        # main.py (app, CORS, errors), stt_routes.py, tts_routes.py, schemas.py
 ├── frontend/   # index.html, style.css, script.js
 ├── outputs/    # generated audio (git-ignored)
@@ -57,13 +57,21 @@ source .venv/bin/activate
 python scripts/download_whisper.py
 ```
 
-This saves the configured model (`openai/whisper-small` by default) to `models/whisper-small`. The app detects that directory and loads it locally. Set `WHISPER_MODEL_PATH=/your/path/to/model` in `.env` to use a different directory. To switch model versions, change `WHISPER_MODEL_ID` before running the download command. Downloading requires internet access once; STT inference afterward uses the local files. You can also preload the model at server startup with `PRELOAD_MODELS=whisper` in `.env`.
+This saves the configured Whisper model (`openai/whisper-small` by default) to `models/whisper-small`. For Qwen2-Audio, download the checkpoint once and configure its local directory:
+
+```bash
+hf download Qwen/Qwen2-Audio-7B-Instruct --local-dir "/media/ganesh/New Volume/models/Qwen2-Audio-7B-Instruct"
+```
+
+Set `QWEN_AUDIO_MODEL_ID` to that directory and `DEFAULT_STT_MODEL=qwen_audio` in `.env`. Qwen2-Audio needs a recent Transformers release and Accelerate; both are included in `requirements.txt`. Model weights load lazily on the first transcription, or can be loaded at startup with `PRELOAD_MODELS=qwen_audio`.
 
 | Model | Hugging Face ID | Notes |
 |---|---|---|
-| Whisper | `openai/whisper-small` (default) | Set `WHISPER_MODEL_ID=openai/whisper-large-v3` before downloading for better Malayalam accuracy (needs more RAM/GPU) |
+| Qwen2-Audio | `Qwen/Qwen2-Audio-7B-Instruct` (default) | Set `QWEN_AUDIO_MODEL_ID` to the local checkpoint path; GPU recommended. |
+| Whisper | `openai/whisper-small` | Set `WHISPER_MODEL_ID=openai/whisper-large-v3` before downloading for better Malayalam accuracy (needs more RAM/GPU) |
 | IndicConformer | `ai4bharat/indic-conformer-600m-multilingual` | Loaded with `trust_remote_code=True`. If you get a 401/403, accept the model's terms on its Hugging Face page and set `HF_TOKEN` in `.env`. If loading fails on a missing package, check the model card for its current requirements. |
-| Indic Parler-TTS | `ai4bharat/indic-parler-tts` (default) | Natural Malayalam speech; GPU recommended. |
+| Maya 2 Native | `maya-research/maya2-native` (default) | Streaming Malayalam/Indic TTS via the `maya3` engine; needs Linux + NVIDIA CUDA 12.8. |
+| Indic Parler-TTS | `ai4bharat/indic-parler-tts` | Natural Malayalam speech; GPU recommended. |
 | MMS TTS | `facebook/mms-tts-mal` | Lightweight VITS fallback, outputs 16 kHz audio. |
 
 > The IndicConformer integration follows the usage shown on its model card. It has not been run end-to-end in the environment this project was generated in, so test it on your machine and adjust `stt/indicconformer_stt.py` if the model's interface has changed.
@@ -74,9 +82,9 @@ The defaults in `.env` are set for your stack:
 
 | Stage | Model | Where it runs | Env var |
 |-------|-------|---------------|---------|
-| STT | `openai/whisper-large-v3` | Local RTX 5060 Ti 16GB | `WHISPER_MODEL_ID` (local HF path or Hub ID) |
+| STT | `Qwen/Qwen2-Audio-7B-Instruct` | Local checkpoint | `QWEN_AUDIO_MODEL_ID` (local HF path or Hub ID) |
 | LLM | `google/gemma-4-E4B-it` | AWS GPU server (vLLM) | `LLM_HOST`, `LLM_MODEL`, `LLM_API_STYLE=openai`, optional `LLM_API_KEY` |
-| TTS | `ai4bharat/indic-parler-tts` | Local (GPU if available) | `INDIC_PARLER_TTS_MODEL_ID`, `INDIC_PARLER_TTS_DESCRIPTION`, `INDIC_PARLER_TTS_DTYPE`, `INDIC_PARLER_TTS_MAX_AUDIO_SECONDS` |
+| TTS | `maya-research/maya2-native` | Local NVIDIA GPU (CUDA 12.8) | `MAYA_TTS_MODEL_ID` (local release directory), `MAYA_TTS_VOICE`, `MAYA_TTS_LANG`, `MAYA_TTS_NORMALIZE`, `MAYA_TTS_MAX_SEATS` |
 
 If you already downloaded `whisper-large-v3` to your PC via HF, set `WHISPER_MODEL_ID` to that local directory path instead of the Hub ID so it loads offline (`HF_HUB_OFFLINE=1`). The STT/TTS code auto-detects CUDA, so both will run on your local GPU when available.
 
@@ -118,7 +126,7 @@ uvicorn api.main:app --reload --port 8000
 
 ### `POST /stt`
 
-Multipart form: `file` (required), `model` (`whisper` | `indicconformer`, optional), `language` (default `ml`).
+Multipart form: `file` (required), `model` (`qwen_audio` | `whisper` | `indicconformer`, optional), `language` (default `ml`).
 
 ```bash
 curl -X POST http://localhost:8000/stt \
@@ -161,7 +169,9 @@ All errors share one shape:
 
 ## Configuration
 
-All settings are environment variables; see `.env.example`. Key ones: `DEFAULT_STT_MODEL`, `DEFAULT_TTS_MODEL`, `DEFAULT_LLM_MODEL`, `WHISPER_MODEL_ID`, `INDICCONFORMER_DECODER` (`ctc`/`rnnt`), `MMS_TTS_MODEL_ID`, `INDIC_PARLER_TTS_MODEL_ID`, `INDIC_PARLER_TTS_DEVICE`, `INDIC_PARLER_TTS_DTYPE`, `INDIC_PARLER_TTS_MAX_AUDIO_SECONDS`, `LLM_HOST`, `LLM_MODEL`, `LLM_API_STYLE`, `LLM_API_KEY`, `LLM_MAX_TOKENS`, `CORS_ORIGINS`, `PRELOAD_MODELS`, `OUTPUT_DIR`, `MAX_UPLOAD_MB`, `TTS_MAX_CHARS`.
+All settings are environment variables; see `.env.example`. Key ones: `DEFAULT_STT_MODEL`, `QWEN_AUDIO_MODEL_ID`, `QWEN_AUDIO_MAX_NEW_TOKENS`, `DEFAULT_TTS_MODEL`, `DEFAULT_LLM_MODEL`, `WHISPER_MODEL_ID`, `INDICCONFORMER_DECODER` (`ctc`/`rnnt`), `MAYA_TTS_MODEL_ID`, `MAYA_TTS_VOICE`, `MAYA_TTS_LANG`, `MAYA_TTS_NORMALIZE`, `MAYA_TTS_MAX_SEATS`, `MMS_TTS_MODEL_ID`, `INDIC_PARLER_TTS_MODEL_ID`, `INDIC_PARLER_TTS_DEVICE`, `INDIC_PARLER_TTS_DTYPE`, `INDIC_PARLER_TTS_MAX_AUDIO_SECONDS`, `LLM_HOST`, `LLM_MODEL`, `LLM_API_STYLE`, `LLM_API_KEY`, `LLM_MAX_TOKENS`, `CORS_ORIGINS`, `PRELOAD_MODELS`, `OUTPUT_DIR`, `MAX_UPLOAD_MB`, `TTS_MAX_CHARS`.
+
+TTS replies are loudness-normalised before they are returned or streamed (`TTS_NORMALIZE=1` by default) so they match the level of the Maya Research web demo. Tune with `TTS_TARGET_RMS_DBFS` (default `-16`), `TTS_PEAK_DBFS` (default `-1`) and `TTS_MAX_GAIN_DB` (default `18`).
 
 The ARI stream also has VAD / half-duplex tuning: `ARI_VAD_ENERGY_THRESHOLD`, `ARI_VAD_SILENCE_SECONDS`, `ARI_VAD_MIN_SPEECH_SECONDS`, `ARI_VAD_PREROLL_SECONDS`, `ARI_FRAME_MS`, `ARI_ECHO_TAIL_SECONDS`.
 

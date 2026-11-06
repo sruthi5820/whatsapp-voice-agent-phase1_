@@ -79,29 +79,40 @@ class WhisperSTT(BaseSTT):
     def __init__(self, model_id: str | None = None) -> None:
         super().__init__()
         # whisper-small is a reasonable CPU default; use whisper-large-v3 on a GPU for better Malayalam.
-        self.model_id = model_id or os.getenv("WHISPER_MODEL_ID", "openai/whisper-small")
-        # The download helper uses this default; an explicit path supports custom locations.
-        configured_path = os.getenv("WHISPER_MODEL_PATH", "models/whisper-small").strip()
-        self.model_path = configured_path if os.path.isdir(configured_path) else ""
-        self.invalid_model_path = configured_path if os.getenv("WHISPER_MODEL_PATH") and not self.model_path else ""
+        configured_id = (model_id or os.getenv("WHISPER_MODEL_ID", "openai/whisper-small")).strip()
+        self.model_id = configured_id
+
+        # ``~`` is expanded so a local snapshot directory works as-is (e.g.
+        # WHISPER_MODEL_ID=~/models/whisper-large-v3). WHISPER_MODEL_PATH is
+        # still honoured for backwards compatibility.
+        configured_path = os.getenv("WHISPER_MODEL_PATH", "").strip()
+        expanded_path = os.path.expanduser(configured_path) if configured_path else ""
+        self.invalid_model_path = (
+            expanded_path if configured_path and not os.path.isdir(expanded_path) else ""
+        )
+
+        expanded_id = os.path.expanduser(configured_id)
+        if expanded_path and os.path.isdir(expanded_path):
+            self.model_path = expanded_path
+            self.model_source = expanded_path
+        elif os.path.isdir(expanded_id):
+            self.model_path = expanded_id
+            self.model_source = expanded_id
+        else:
+            self.model_path = ""
+            self.model_source = configured_id
+
         self._pipe = None
 
-    def _load(self) -> None:
-        if self.invalid_model_path:
-            raise FileNotFoundError(f"WHISPER_MODEL_PATH does not exist: {self.invalid_model_path}")
-        import torch
-        from transformers import pipeline
-
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        model_source = self.model_path or self.model_id
-        logger.info("Whisper '%s' on %s", model_source, device)
+    def _build_pipeline(self, pipeline, device: str, dtype):
+        logger.info("Whisper '%s' on %s (%s)", self.model_source, device, dtype)
         # A filesystem path is unambiguously local; don't pass local_files_only
         # through model_kwargs because pipeline also supplies it to AutoConfig.
-        self._pipe = pipeline(
+        return pipeline(
             "automatic-speech-recognition",
-            model=model_source,
-            tokenizer=model_source,
-            feature_extractor=model_source,
+            model=self.model_source,
+            tokenizer=self.model_source,
+            feature_extractor=self.model_source,
             device=device,
             torch_dtype=dtype,
             model_kwargs={"low_cpu_mem_usage": True},
@@ -109,28 +120,30 @@ class WhisperSTT(BaseSTT):
         )
 
     def _load(self) -> None:
+        if self.invalid_model_path:
+            raise FileNotFoundError(f"WHISPER_MODEL_PATH does not exist: {self.invalid_model_path}")
         import torch
         from transformers import pipeline
 
         device = _resolve_device(torch)
         dtype = _resolve_dtype(torch, device)
-        logger.info("Loading Whisper '%s' on %s (%s)", self.model_id, device, dtype)
+        logger.info("Loading Whisper '%s' on %s (%s)", self.model_source, device, dtype)
 
         try:
-            self._pipe = self._build_pipeline(pipeline, torch, device, dtype)
+            self._pipe = self._build_pipeline(pipeline, device, dtype)
         except RuntimeError as exc:
             if device == "cpu" or not _is_oom(exc, torch):
                 raise
             logger.warning(
                 "CUDA out of memory loading Whisper '%s'; falling back to CPU. "
                 "Free GPU memory to use the GPU again.",
-                self.model_id,
+                self.model_source,
             )
             torch.cuda.empty_cache()
-            self._pipe = self._build_pipeline(pipeline, torch, "cpu", torch.float32)
+            self._pipe = self._build_pipeline(pipeline, "cpu", torch.float32)
             device, dtype = "cpu", torch.float32
 
-        logger.info("Whisper '%s' ready on %s (%s)", self.model_id, device, dtype)
+        logger.info("Whisper '%s' ready on %s (%s)", self.model_source, device, dtype)
 
     def _transcribe(self, audio_path: str, language: str) -> str:
         audio = load_audio(audio_path)

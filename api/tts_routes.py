@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from tts import (
+from tts_models import (
     SynthesisError,
     TTSModelLoadError,
     UnknownTTSModelError,

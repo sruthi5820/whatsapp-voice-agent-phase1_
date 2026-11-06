@@ -41,7 +41,7 @@ from stt import (
     get_stt_model,
 )
 from stt.base_stt import TARGET_SAMPLE_RATE
-from tts import (
+from tts_models import (
     SynthesisError,
     TTSModelLoadError,
     UnknownTTSModelError,
@@ -413,7 +413,7 @@ def ari_status() -> dict:
     """ARI bridge configuration and model availability."""
     from llm import available_llm_models
     from stt import available_stt_models
-    from tts import available_tts_models
+    from tts_models import available_tts_models
 
     return {
         "websocket": "/ari/stream",

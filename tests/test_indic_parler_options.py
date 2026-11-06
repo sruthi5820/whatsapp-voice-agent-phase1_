@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tts.indic_parler_tts import _resolve_device  # noqa: E402
+from tts_models.indic_parler_tts import _resolve_device  # noqa: E402
 
 
 class FakeCuda:
@@ -70,14 +70,14 @@ class FakeTorchDtype:
 
 
 def test_dtype_is_float32_on_cpu(monkeypatch):
-    from tts.indic_parler_tts import _resolve_dtype
+    from tts_models.indic_parler_tts import _resolve_dtype
 
     monkeypatch.delenv("INDIC_PARLER_TTS_DTYPE", raising=False)
     assert _resolve_dtype(FakeTorchDtype(), "cpu") == "float32"
 
 
 def test_auto_dtype_prefers_bf16_then_fp16(monkeypatch):
-    from tts.indic_parler_tts import _resolve_dtype
+    from tts_models.indic_parler_tts import _resolve_dtype
 
     monkeypatch.delenv("INDIC_PARLER_TTS_DTYPE", raising=False)
     assert _resolve_dtype(FakeTorchDtype(bf16=True), "cuda") == "bfloat16"
@@ -85,7 +85,7 @@ def test_auto_dtype_prefers_bf16_then_fp16(monkeypatch):
 
 
 def test_explicit_dtype_is_honoured(monkeypatch):
-    from tts.indic_parler_tts import _resolve_dtype
+    from tts_models.indic_parler_tts import _resolve_dtype
 
     monkeypatch.setenv("INDIC_PARLER_TTS_DTYPE", "fp32")
     assert _resolve_dtype(FakeTorchDtype(bf16=True), "cuda") == "float32"
@@ -93,7 +93,7 @@ def test_explicit_dtype_is_honoured(monkeypatch):
 
 def test_max_new_tokens_from_audio_seconds():
     from types import SimpleNamespace
-    from tts.indic_parler_tts import _max_new_tokens
+    from tts_models.indic_parler_tts import _max_new_tokens
 
     config = SimpleNamespace(sampling_rate=44100, audio_encoder=SimpleNamespace(hop_length=512))
     assert _max_new_tokens(config, 10) == 861

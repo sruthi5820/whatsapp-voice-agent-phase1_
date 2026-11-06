@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 import llm as llm_pkg  # noqa: E402
 import stt as stt_pkg  # noqa: E402
-import tts as tts_pkg  # noqa: E402
+import tts_models as tts_pkg  # noqa: E402
 
 from . import ari_routes, llm_routes, stt_routes, tts_routes, voice_routes  # noqa: E402
 from .schemas import APIError, HealthResponse  # noqa: E402

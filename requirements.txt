@@ -13,7 +13,8 @@ imageio-ffmpeg>=0.6          # bundled ffmpeg fallback for browser WebM recordin
 
 # --- Models ---
 torch>=2.1
-transformers>=4.40
+transformers>=4.45
+accelerate>=0.26            # required for Qwen2-Audio device_map="auto"
 huggingface_hub[cli]>=0.34    # provides the `hf` CLI (`hf download ...`)
 onnxruntime>=1.17            # used by AI4Bharat IndicConformer (check the model card if loading fails)
 
@@ -24,7 +25,13 @@ httpx>=0.27                  # needed by FastAPI's TestClient and the Ollama cli
 # --- Asterisk ARI bridge (asterisk/ari_bridge.py) ---
 websockets>=12.0             # ARI events WebSocket client for the Stasis application
 
+# --- TTS: Maya 2 Native (default, maya-research/maya2-native) ---
+# Linux + NVIDIA GPU (CUDA 12.8). Install separately; it pins its own torch/transformers:
+#   pip install "maya3[server] @ git+https://github.com/MayaResearch/maya2-native" \
+#       --extra-index-url https://download.pytorch.org/whl/cu128
+# Set MAYA_TTS_MODEL_ID to the local model directory (or the HF repo id).
+
 # --- TTS: Indic Parler-TTS (ai4bharat/indic-parler-tts) ---
-# Installed from the HuggingFace parler-tts repo (required by tts/indic_parler_tts.py).
-# Install separately if you hit network restrictions:  pip install git+https://github.com/huggingface/parler-tts.git
-git+https://github.com/huggingface/parler-tts.git
+# Optional legacy engine. Installed from the HuggingFace parler-tts repo (required by tts_models/indic_parler_tts.py).
+# Install separately only if you need it:  pip install git+https://github.com/huggingface/parler-tts.git
+# git+https://github.com/huggingface/parler-tts.git

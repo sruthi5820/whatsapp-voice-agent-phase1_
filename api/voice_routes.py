@@ -17,7 +17,7 @@ from stt import (
     UnknownSTTModelError,
     get_stt_model,
 )
-from tts import (
+from tts_models import (
     SynthesisError,
     TTSModelLoadError,
     UnknownTTSModelError,
@@ -185,7 +185,7 @@ def voice_assistant(
             raise APIError(400, "Empty file", "The uploaded file has no content.")
 
         text = stt.transcribe(tmp_path, language)
-        logger.info("Voice STT '%s': %s", stt_name, text)
+        logger.info("Voice STT '%s' [%s]: %s", stt_name, language, text or "(empty)")
         if not text.strip():
             raise APIError(
                 400,

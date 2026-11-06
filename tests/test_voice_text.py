@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api import voice_routes  # noqa: E402
 from api.main import app  # noqa: E402
-from tts import SynthesisResult  # noqa: E402
+from tts_models import SynthesisResult  # noqa: E402
 
 
 class FakeLLM:
